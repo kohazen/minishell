@@ -14,12 +14,18 @@ void sigint_handler(int sig) {
     fflush(stdout); // Ensures the prompt appears immediately
 }
 
+void sigchld_handler(int sig) { 
+    // WNOHANG ensures the shell doesn't block if there are no dead children found.
+    while (waitpid(-1, NULL, WNOHANG) > 0); 
+}
+
 int main() {
     char input[MAX_CMD_LEN];
     char *args[MAX_ARGS]; 
     int background = 0;
 
     signal(SIGINT, sigint_handler);
+    signal(SIGCHLD, sigchld_handler); 
 
     while (1) {
         printf("myshell> ");
