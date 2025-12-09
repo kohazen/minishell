@@ -1,0 +1,392 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    breaklines=true,
+    captionpos=b,
+    language=C
+}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Lab 1: Mini UNIX Shell}
+\lhead{Technical Report}
+\rfoot{Page \thepage}
+
+\title{\textbf{Mini UNIX Shell}\\Technical Report}
+\author{Saurabh Pandey (2025MCS), Maj Girish Singh Thakur (2025MCS2973)}
+\date{December 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This technical report documents the design, implementation, and testing of a UNIX-style command-line shell (myshell) developed in C. The shell implements core functionality including external program execution, argument parsing with quoted string support, I/O redirection, single-stage pipelines, background process execution, and built-in commands. The implementation demonstrates key operating system concepts such as process management, file descriptor manipulation, signal handling, and inter-process communication.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Objectives}
+The primary objective of this project was to design and implement a functional UNIX shell that:
+\begin{itemize}[leftmargin=*]
+    \item Executes external programs using PATH resolution
+    \item Parses command-line arguments including quoted strings
+    \item Implements I/O redirection (stdin and stdout)
+    \item Supports single-stage pipelines between commands
+    \item Enables background process execution
+    \item Provides essential built-in commands (cd, exit)
+    \item Handles errors gracefully without crashing
+    \item Manages signals appropriately (Ctrl-C, zombie processes)
+\end{itemize}
+
+\subsection{System Requirements}
+\begin{itemize}[leftmargin=*]
+    \item Operating System: UNIX-like (Linux, macOS, BSD)
+    \item Compiler: GCC with C99 standard support
+    \item Build System: GNU Make
+    \item Standard Libraries: POSIX-compliant system calls
+\end{itemize}
+
+\section{Architecture and Design}
+
+\subsection{Overall Architecture}
+The shell follows a classic REPL (Read-Eval-Print Loop) architecture with the following major components:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Input Handler:} Reads user input and performs initial preprocessing
+    \item \textbf{Tokenizer:} Breaks input into tokens (words, operators, quotes)
+    \item \textbf{Parser:} Constructs command structures from tokens
+    \item \textbf{Executor:} Forks processes and sets up execution environment
+    \item \textbf{Signal Manager:} Handles asynchronous signals (SIGINT, SIGCHLD)
+\end{enumerate}
+
+\subsection{Data Structures}
+
+\subsubsection{Command Structure}
+\begin{lstlisting}
+typedef struct {
+    char *argv[MAX_ARGV];    // Argument array
+    char *infile;            // Input redirection file
+    char *outfile;           // Output redirection file
+    int background;          // Background flag
+} Command;
+\end{lstlisting}
+
+This structure encapsulates all information needed to execute a single command, including arguments, I/O redirection targets, and execution mode.
+
+\subsection{Design Decisions}
+
+\subsubsection{Tokenization Strategy}
+The tokenizer implements a state-machine approach that:
+\begin{itemize}[leftmargin=*]
+    \item Recognizes quoted strings (single and double quotes)
+    \item Handles escape sequences within double quotes
+    \item Treats operators ($<$, $>$, $|$, \&, ;) as separate tokens
+    \item Preserves whitespace within quoted strings
+    \item Dynamically allocates token storage for flexibility
+\end{itemize}
+
+\subsubsection{Process Management}
+\textbf{Foreground Processes:} The parent shell waits for foreground processes using \texttt{waitpid()}, ensuring synchronous execution and proper exit status collection.
+
+\textbf{Background Processes:} For background jobs, the shell:
+\begin{enumerate}[leftmargin=*]
+    \item Prints the PID immediately after forking
+    \item Returns control to the user without waiting
+    \item Relies on SIGCHLD handler for zombie cleanup
+\end{enumerate}
+
+\subsubsection{Signal Handling}
+Two signal handlers are installed at startup:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{SIGINT Handler:} Prevents Ctrl-C from terminating the shell while allowing it to interrupt foreground children
+    \item \textbf{SIGCHLD Handler:} Automatically reaps zombie processes using non-blocking \texttt{waitpid()} with WNOHANG flag
+\end{itemize}
+
+\section{Implementation Details}
+
+\subsection{Core Functions}
+
+\subsubsection{Tokenization (\texttt{tokenize\_sb})}
+The tokenizer scans the input string character by character:
+\begin{lstlisting}
+static int tokenize_sb(const char *line, char **tokens, 
+                       int max_tokens) {
+    // Handles quotes, operators, and whitespace
+    // Returns token count
+    // Dynamically allocates each token
+}
+\end{lstlisting}
+
+\textbf{Key Features:}
+\begin{itemize}[leftmargin=*]
+    \item Quote-aware parsing (preserves spaces in quoted strings)
+    \item Escape sequence support in double quotes
+    \item Operator detection ($<$, $>$, $|$, \&)
+    \item Whitespace handling
+\end{itemize}
+
+\subsubsection{Command Parsing (\texttt{parse\_command\_from\_tokens\_sb})}
+Converts token array into Command structure:
+\begin{lstlisting}
+static int parse_command_from_tokens_sb(char **tokens, 
+    int start, int end, Command *cmd) {
+    // Identifies redirection operators
+    // Builds argv array
+    // Sets background flag
+    // Validates syntax
+}
+\end{lstlisting}
+
+\textbf{Error Detection:}
+\begin{itemize}[leftmargin=*]
+    \item Missing filenames after redirection operators
+    \item Misplaced ampersand (\&) operator
+    \item Excessive argument count
+\end{itemize}
+
+\subsubsection{Single Command Execution (\texttt{execute\_single\_sb})}
+Handles both built-in and external commands:
+\begin{lstlisting}
+static int execute_single_sb(Command *cmd) {
+    // Check for built-ins (cd, exit)
+    // Fork for external commands
+    // Setup I/O redirection in child
+    // Execute via execvp()
+    // Parent waits or returns (background)
+}
+\end{lstlisting}
+
+\textbf{I/O Redirection Setup:}
+\begin{enumerate}[leftmargin=*]
+    \item Open file with appropriate flags
+    \item Use \texttt{dup2()} to redirect file descriptor
+    \item Close original file descriptor
+    \item Proceed with \texttt{execvp()}
+\end{enumerate}
+
+\subsubsection{Pipeline Execution (\texttt{execute\_pipe\_sb})}
+Implements single-stage pipelines using unnamed pipes:
+\begin{lstlisting}
+static int execute_pipe_sb(Command *left, Command *right) {
+    int pipefd[2];
+    pipe(pipefd);
+    
+    // Fork left command (producer)
+    // Redirect stdout to pipe write end
+    
+    // Fork right command (consumer)
+    // Redirect stdin to pipe read end
+    
+    // Close pipe in parent
+    // Wait for both children
+}
+\end{lstlisting}
+
+\textbf{Pipe Coordination:}
+\begin{itemize}[leftmargin=*]
+    \item Left process writes to \texttt{pipefd[1]} (stdout)
+    \item Right process reads from \texttt{pipefd[0]} (stdin)
+    \item Parent closes both ends to avoid blocking
+    \item Proper wait order prevents deadlocks
+\end{itemize}
+
+\subsection{Built-in Commands}
+
+\subsubsection{cd (Change Directory)}
+\begin{lstlisting}
+if (strcmp(cmd->argv[0], "cd") == 0) {
+    const char *dir = cmd->argv[1] ? 
+        cmd->argv[1] : getenv("HOME");
+    if (chdir(dir) != 0) 
+        perror_continue("cd");
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{Rationale:} Must be a built-in because changing directory in a child process doesn't affect the parent shell's working directory.
+
+\subsubsection{exit (Terminate Shell)}
+\begin{lstlisting}
+if (strcmp(cmd->argv[0], "exit") == 0) {
+    exit(0);
+}
+\end{lstlisting}
+
+\textbf{Rationale:} Built-in to ensure clean shell termination and avoid spawning unnecessary processes.
+
+\subsection{Memory Management}
+\textbf{Token Lifecycle:}
+\begin{enumerate}[leftmargin=*]
+    \item Allocated in \texttt{tokenize\_sb()} using \texttt{malloc()}
+    \item Used during parsing phase
+    \item Freed in \texttt{free\_tokens\_sb()} after command execution
+\end{enumerate}
+
+\textbf{Command Lifecycle:}
+\begin{enumerate}[leftmargin=*]
+    \item Command structure populated with \texttt{strdup()}'d strings
+    \item Used during execution
+    \item Freed in \texttt{free\_command\_sb()} after execution
+\end{enumerate}
+
+\section{Challenges and Solutions}
+
+\subsection{Challenge 1: Zombie Process Accumulation}
+\textbf{Problem:} Background processes become zombies if not reaped.
+
+\textbf{Solution:} Installed SIGCHLD handler that calls \texttt{waitpid(-1, NULL, WNOHANG)} in a loop to reap all terminated children without blocking.
+
+\subsection{Challenge 2: Pipe File Descriptor Leaks}
+\textbf{Problem:} Parent must close both pipe ends to avoid blocking children.
+
+\textbf{Solution:} Explicitly close \texttt{pipefd[0]} and \texttt{pipefd[1]} in parent after both children are forked.
+
+\subsection{Challenge 3: Quote Parsing Complexity}
+\textbf{Problem:} Handling quotes while preserving whitespace and recognizing escape sequences.
+
+\textbf{Solution:} State-based tokenizer that tracks quote context and handles escape characters specially within double quotes.
+
+\subsection{Challenge 4: Semicolon vs. Pipe Precedence}
+\textbf{Problem:} Determining whether semicolons or pipes should be parsed first.
+
+\textbf{Solution:} Split on semicolons first (outer level), then check for pipes within each sub-command. This allows constructs like: \texttt{cmd1 | cmd2 ; cmd3}
+
+\subsection{Challenge 5: Signal Safety in Child Processes}
+\textbf{Problem:} Child processes inherit parent's signal handlers.
+
+\textbf{Solution:} Reset SIGINT to default (\texttt{SIG\_DFL}) in child processes before \texttt{execvp()} to allow Ctrl-C to work normally in foreground programs.
+
+\section{Testing}
+
+\subsection{Test Methodology}
+A comprehensive automated test suite (\texttt{tests/run\_tests.sh}) validates all functional requirements:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Test Category} & \textbf{Test Count} \\
+\hline
+Basic execution & 2 \\
+I/O redirection & 3 \\
+Pipelines & 2 \\
+Background jobs & 1 \\
+Built-ins & 1 \\
+Error handling & 2 \\
+Command sequencing & 1 \\
+\hline
+\textbf{Total} & \textbf{12} \\
+\hline
+\end{tabular}
+\caption{Test Suite Coverage}
+\end{table}
+
+\subsection{Test Results}
+All 12 tests pass successfully, validating:
+\begin{itemize}[leftmargin=*]
+    \item Correct program execution and output
+    \item Proper I/O redirection behavior
+    \item Pipeline data flow
+    \item Background process creation
+    \item Built-in command functionality
+    \item Appropriate error messages for malformed input
+\end{itemize}
+
+\subsection{Edge Cases Tested}
+\begin{enumerate}[leftmargin=*]
+    \item Empty input lines
+    \item Commands with only whitespace
+    \item Misplaced operators (pipe at start/end)
+    \item Missing redirection filenames
+    \item Multiple redirections in same command
+    \item Quoted arguments with embedded spaces
+\end{enumerate}
+
+\section{Performance Analysis}
+
+\subsection{Time Complexity}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Tokenization:} O(n) where n is input length
+    \item \textbf{Parsing:} O(t) where t is token count
+    \item \textbf{Execution:} O(1) for single commands, O(2) for pipes
+\end{itemize}
+
+\subsection{Space Complexity}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Token storage:} O(t) for t tokens
+    \item \textbf{Command structure:} O(a) for a arguments
+    \item Maximum of MAX\_TOKENS (256) and MAX\_ARGV (128) enforced
+\end{itemize}
+
+\section{Limitations and Future Work}
+
+\subsection{Current Limitations}
+\begin{enumerate}[leftmargin=*]
+    \item No multi-stage pipelines (only cmd1 $|$ cmd2 supported)
+    \item No append redirection ($>>$)
+    \item No here-documents ($<<$)
+    \item No environment variable expansion (\$VAR)
+    \item No wildcard globbing (*,?,[ ])
+    \item No command history
+    \item No job control (fg, bg, jobs)
+\end{enumerate}
+
+\subsection{Proposed Enhancements}
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Multi-stage pipelines:} Recursive pipeline parsing
+    \item \textbf{Command history:} Linked list of previous commands
+    \item \textbf{Job control:} Process group management and terminal control
+    \item \textbf{Tab completion:} PATH and filename completion
+    \item \textbf{Environment variables:} Export/unset commands with \$VAR expansion
+    \item \textbf{Scripting support:} If/while/for constructs
+\end{enumerate}
+
+\section{Conclusion}
+
+This project successfully demonstrates the core concepts of UNIX shell implementation including process management, I/O redirection, inter-process communication via pipes, and signal handling. The modular design separates concerns effectively (tokenization, parsing, execution) making the codebase maintainable and extensible.
+
+Key achievements:
+\begin{itemize}[leftmargin=*]
+    \item Robust tokenizer handling quoted strings and operators
+    \item Proper process lifecycle management (fork/exec/wait)
+    \item Correct I/O redirection via file descriptor manipulation
+    \item Functional pipeline implementation using unnamed pipes
+    \item Safe signal handling preventing shell termination
+    \item Comprehensive error checking and reporting
+    \item Complete test suite validating all requirements
+\end{itemize}
+
+The implementation serves as a solid foundation for understanding operating system internals and can be extended with advanced features as outlined in the future work section.
+
+\section{References}
+
+\begin{enumerate}[leftmargin=*]
+    \item Stevens, W. R., \& Rago, S. A. (2013). \textit{Advanced Programming in the UNIX Environment} (3rd ed.). Addison-Wesley.
+    \item Kerrisk, M. (2010). \textit{The Linux Programming Interface}. No Starch Press.
+    \item POSIX.1-2017 (IEEE Std 1003.1-2017). \textit{The Open Group Base Specifications}.
+    \item \texttt{fork(2)}, \texttt{execvp(3)}, \texttt{pipe(2)}, \texttt{dup2(2)} - Linux manual pages.
+\end{enumerate}
+
+\end{document}
